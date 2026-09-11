@@ -1,69 +1,147 @@
 import streamlit as st
-import pandas as pd
 import random
+from supabase import create_client
 
-# 網頁基本設定
-st.set_page_config(page_title="Z世代餐廳地圖", page_icon="🍔", layout="wide")
-st.title("🍔 Z世代餐廳地圖 App 原型測試")
-st.caption("公開透明、整合 Google/IG 資訊、AI 情境穿搭推薦")
+# 1. Supabase 連線設定
+SUPABASE_URL = "https://rowtumtnlhpavqokarxp.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvd3R1bXRubGhwYXZxb2thcnhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTM2NzUsImV4cCI6MjEwNDUyOTY3NX0.IoMcwRCFsxD7Y17BK696ONXeBvn_4Q-1nMqwuPqxE78"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 模擬資料庫
-restaurants = [
-    {"名稱": "網美風：微光森林 Cafe", "分類": "網美餐廳", "均消": 450, "評價": "4.8 ★ (IG熱門)", "月業績": 950000},
-    {"名稱": "老牌：金牌張排骨大王", "分類": "老牌餐廳", "均消": 150, "評價": "4.5 ★ (Google千評)", "月業績": 880000},
-    {"名稱": "精緻：Aether 法式現代料理", "分類": "精緻餐廳", "均消": 2500, "評價": "4.9 ★ (頂級私廚)", "月業績": 1200000},
-    {"名稱": "平價：九零後麻辣燙", "分類": "平價餐廳", "均消": 180, "評價": "4.3 ★ (學生最愛)", "月業績": 520000},
-    {"名稱": "網美風：粉紅泡泡餐酒館", "分類": "網美餐廳", "均消": 600, "評價": "4.7 ★ (拍照聖地)", "月業績": 710000},
-]
+st.set_page_config(page_title="Z-Gen 餐廳地圖", page_icon="🍽️", layout="wide")
+st.title("Z-Generation 餐廳地圖 🍽️")
 
-# 側邊欄：商家與平台機制展示
-st.sidebar.header("🏪 商家與平台專區")
-st.sidebar.subheader("💰 餐廳加入平台會費")
-st.sidebar.code("月費方案：$1,500 / 月\n季費方案：$1,200 / 月 (省20%)\n年費方案：$900 / 月 (省40%)\n💡 買越久越便宜！")
+# 2. 從 Supabase 抓取資料
+@st.cache_data(ttl=60)
+def load_data():
+    response = supabase.table("restaurants").select("*").execute()
+    return response.data
 
-st.sidebar.subheader("🏆 年度業績大賽")
-st.sidebar.info("🥇 第一名：獎金 $100,000\n🥈 第二名：獎金 $50,000\n🥉 第三名：獎金 $30,000")
+try:
+    data = load_data()
 
-# 主頁面：功能標籤頁
-tab1, tab2, tab3 = st.tabs(["🗺️ 餐廳地圖瀏覽", "🤖 AI 穿搭與情境推薦", "👑 每月排行榜"])
+    # 建立三個頁籤：分類探索 vs AI 今日風格 vs 業績獎金制度
+    tab1, tab2, tab3 = st.tabs(["🗄️ 分類探索", "✨ AI 今日風格氛圍", "💰 業績獎金制度"])
 
-with tab1:
-    st.header("探索全新世代餐廳")
-    cate = st.multiselect("選擇你想找的餐廳種類：", ["網美餐廳", "老牌餐廳", "精緻餐廳", "平價餐廳"], default=["網美餐廳", "老牌餐廳", "精緻餐廳", "平價餐廳"])
-    
-    st.write("---")
-    for r in restaurants:
-        if r["分類"] in cate:
-            # 模擬前三名皇冠
-            crown = "👑 " if r["月業績"] >= 880000 else ""
-            st.subheader(f"{crown}{r['名稱']}")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("💰 價格公開透明 (均消)", f"${r['均消']}")
-            col2.write(f"🌟 **社群整合數據**\n\n{r['評價']}")
-            col3.button("查看 Google / IG 詳細串聯資料", key=r["名稱"])
-            st.write("---")
+    # --- 頁籤 1：分類探索 ---
+    with tab1:
+        all_tags = set()
+        for item in data:
+            if item.get("tags"):
+                all_tags.update(item["tags"])
 
-with tab2:
-    st.header("🤖 AI 穿搭與目的地智能推薦")
-    st.caption("付費用戶可解鎖更多推薦")
-    
-    style = st.text_input("今天的穿搭風格是？（例如：美式復古、韓系街頭、正式西裝）")
-    purpose = st.selectbox("今天的聚會目的是？", ["談生意", "浪漫約會", "生日慶祝", "單純跟朋友聚餐"])
-    
-    if st.button("啟動 AI 推薦餐廳"):
-        st.success(f"AI 根據您的【{style}】穿搭與【{purpose}】目的，為您精選以下餐廳：")
+        selected_tag = st.selectbox("選擇分類置物櫃：", ["全部餐廳"] + sorted(list(all_tags)))
+
+        if selected_tag != "全部餐廳":
+            filtered_data = [r for r in data if r.get("tags") and selected_tag in r["tags"]]
+        else:
+            filtered_data = data
+
+        st.write(f"顯示共 **{len(filtered_data)}** 家餐廳：")
+
+        for spot in filtered_data:
+            with st.container(border=True):
+                st.subheader(spot.get("name", "未命名餐廳"))
+                col1, col2 = st.columns(2)
+                col1.write(f"💰 平均消費：${spot.get('avg_price', 'N/A')}")
+                col2.write(f"⭐ 評分：{spot.get('rating', 'N/A')}")
+                
+                if spot.get("tags"):
+                    st.caption("🏷️ " + " ".join([f"`#{t}`" for t in spot["tags"]]))
+                
+                btn_col1, btn_col2 = st.columns(2)
+                if spot.get("google_map_url"):
+                    btn_col1.link_button("📍 Google 地圖", spot["google_map_url"])
+                if spot.get("ig_url"):
+                    btn_col2.link_button("📸 Instagram", spot["ig_url"])
+
+    # --- 頁籤 2：AI 今日風格氛圍 ---
+    with tab2:
+        st.subheader("🤖 AI 今日靈感推薦")
+        st.write("不確定今天想吃什麼？讓 AI 根據今日氛圍幫你挑選！")
         
-        st.subheader("🔓 基本款推薦（免費瀏覽 2 個）")
-        st.info("1. 微光森林 Cafe - 氣氛極佳，完美契合您的穿搭")
-        st.info("2. Aether 法式現代料理 - 隱密性高，最適合您的聚會目的")
-        
-        st.write("---")
-        st.subheader("💎 Prime 會員專屬（解鎖額外 3 個推薦）")
-        st.warning("⚠️ 需每月支付訂閱費以解鎖 Prime 款進階推薦餐廳功能！")
-        if st.button("立即付費解鎖額外 3 個推薦"):
+        mood = st.radio(
+            "你今天的精神狀態/氛圍是？",
+            ["✨ 想要精緻高質感", "🔥 爽快解壓/重口味", "☕ 浪漫約會/放鬆氛圍", "🎲 隨便 AI 幫我選"]
+        )
+
+        if st.button("🔮 生成今日風格推薦", type="primary"):
+            recommendation = None
+            
+            if mood == "✨ 想要精緻高質感":
+                candidates = [r for r in data if r.get("avg_price", 0) and r.get("avg_price", 0) >= 1500]
+            elif mood == "🔥 爽快解壓/重口味":
+                candidates = [r for r in data if any(t in ["麻辣燙", "湖南湘菜", "川菜", "精釀啤酒"] for t in r.get("tags", []))]
+            elif mood == "☕ 浪漫約會/放鬆氛圍":
+                candidates = [r for r in data if any(t in ["約會首選", "陽明山夜景", "頂級私廚", "飯店餐廳"] for t in r.get("tags", []))]
+            else:
+                candidates = data
+
+            if not candidates:
+                candidates = data
+
+            recommendation = random.choice(candidates)
+
             st.balloons()
+            st.success("🎉 AI 推薦你今天去這裡：")
+            
+            with st.container(border=True):
+                st.title(f"👉 {recommendation.get('name')}")
+                st.write(f"💰 預估消費：${recommendation.get('avg_price')} | ⭐ 評分：{recommendation.get('rating')}")
+                if recommendation.get("tags"):
+                    st.write("🏷️ " + " ".join([f"`#{t}`" for t in recommendation["tags"]]))
+                
+                btn1, btn2 = st.columns(2)
+                if recommendation.get("google_map_url"):
+                    btn1.link_button("📍 前往 Google 地圖", recommendation["google_map_url"])
+                if recommendation.get("ig_url"):
+                    btn2.link_button("📸 查看 Instagram", recommendation["ig_url"])
 
-with tab3:
-    st.header("👑 本月業績排行榜 (自動標示皇冠)")
-    df = pd.DataFrame(restaurants).sort_values(by="月業績", ascending=False)
-    st.dataframe(df)
+    # --- 頁籤 3：業績獎金制度 ---
+    with tab3:
+        st.subheader("💰 團隊開發與業績獎金制度")
+        st.write("鼓勵同仁積極推薦優質店家，打造最豐富的 Z 世代美食地圖！")
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("基礎推薦獎金", "$200 / 店", "成功建立資料並核准")
+        col2.metric("高人氣店家加碼", "$500 / 店", "獲得 50+ 次收藏/點擊")
+        col3.metric("月度開發王獎金", "$3,000", "當月新增最多有效店家")
+
+        st.markdown("---")
+        
+        # 👑 皇冠連勝與累積加碼獎金機制
+        st.subheader("👑 皇冠連勝與累積加碼獎金機制")
+        st.caption("店家或同仁獲得 👑 皇冠標章（上榜 Top 3）可選擇每月單次領取，或持續累積連勝解鎖更高加碼與終極福利！")
+
+        streak_col1, streak_col2, streak_col3 = st.columns(3)
+
+        with streak_col1:
+            st.caption("連勝 2 個月")
+            st.metric(label="獲得 👑 皇冠標章", value="+2% 額外獎金")
+
+        with streak_col2:
+            st.caption("連勝 6 個月")
+            st.metric(label="獲得 👑👑👑 三皇冠", value="+6% 額外獎金")
+
+        with streak_col3:
+            st.caption("滿 1 年 (12 個月)")
+            st.metric(label="👑 殿堂級店家專屬", value="+12% 額外獎金", delta="加贈 12 個月免費刊登")
+
+        st.markdown("---")
+
+        # 📌 活動參與門檻與排他/同分規範提示框
+        st.info("""
+📌 **活動參與與評選規範：**
+1. **參賽資格門檻**：限當月來客數達 **1,000 人次以上**（或單月營業額達 30 萬元以上）之合作店家參加。
+2. **單一獲獎限制**：當月每家店家**限獲頒一個獎項**（若於多個榜單同時上榜，將優先保留名次較高之獎項，其餘順位由後續店家順延）。
+3. **同分比序機制**：若店家綜合評分相同，將以**加入簽約會員之時間先後順序**優先決定排名順位。
+""")
+
+        st.write("**📋 獎金發放與審核規則：**")
+        st.markdown("""
+        * **完整欄位要求**：新增店家必須包含 `店家名稱`、`平均消費`、`Google 地圖連結` 及至少 `2 個標籤`。
+        * **品質與核實**：由管理團隊審核資料真實性，通過後於次月薪資統一發放。
+        * **重複店家判定**：若重複推薦，獎金歸屬於首位提交完整資料之同仁。
+        """)
+
+except Exception as e:
+    st.error(f"連線失敗：{e}")
