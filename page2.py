@@ -1,153 +1,249 @@
 import streamlit as st
-import random
-from supabase import create_client
+import streamlit.components.v1 as components
 
-# 1. Supabase 連線設定
-SUPABASE_URL = "https://rowtumtnlhpavqokarxp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvd3R1bXRubGhwYXZxb2thcnhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTM2NzUsImV4cCI6MjEwNDUyOTY3NX0.IoMcwRCFsxD7Y17BK696ONXeBvn_4Q-1nMqwuPqxE78"
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# 設定頁面滿版與標題
+st.set_page_config(layout="wide", page_title="Z-Gen 奢華美食地圖", initial_sidebar_state="collapsed")
 
-st.set_page_config(page_title="Z-Gen 餐廳地圖", page_icon="🍽️", layout="wide")
-st.title("Z-Generation 餐廳地圖 🍽️")
+html_code = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { background-color: #0b0f19; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; }
+    ::-webkit-scrollbar { height: 6px; width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; margin-right: 5px; margin-bottom: 5px; }
+    .card { background-color: #1e293b; padding: 16px; border-radius: 14px; border: 1px solid #334155; margin-bottom: 12px; }
+    button { cursor: pointer; transition: opacity 0.2s; }
+    button:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
 
-# 2. 從 Supabase 抓取資料
-@st.cache_data(ttl=60)
-def load_data():
-    response = supabase.table("restaurants").select("*").execute()
-    return response.data
+  <script type="text/babel">
+    const { useState } = React;
 
-try:
-    data = load_data()
+    const RESTAURANTS = [
+      { id: 1, name: "頂級頂樓微醺酒吧", category: "奢華酒吧", price: 1500, rating: 4.8, streak: 12, tags: ["高空夜景", "約會首選", "微醺"], mapUrl: "https://maps.google.com", igUrl: "https://instagram.com", image: "🍷" },
+      { id: 2, name: "極上黑毛和牛燒肉", category: "極緻燒肉", price: 2500, rating: 4.9, streak: 8, tags: ["和牛專賣", "極致口感", "聚餐包廂"], mapUrl: "https://maps.google.com", igUrl: "https://instagram.com", image: "🥩" },
+      { id: 3, name: "雲端陽明山夜景餐廳", category: "浪漫夜景", price: 1200, rating: 4.7, streak: 15, tags: ["陽明山夜景", "約會首選", "飯店餐廳"], mapUrl: "https://maps.google.com", igUrl: "https://instagram.com", image: "🌙" }
+    ];
 
-    # 建立三個頁籤：分類探索 vs AI 今日風格 vs 競賽與獎金制度
-    tab1, tab2, tab3 = st.tabs(["🗄️ 分類探索", "✨ AI 今日風格氛圍", "🏆 競賽與獎金制度"])
+    const allTags = ['All', '高空夜景', '約會首選', '微醺', '和牛專賣', '極致口感', '聚餐包廂', '陽明山夜景'];
 
-    # --- 頁籤 1：分類探索 ---
-    with tab1:
-        all_tags = set()
-        for item in data:
-            if item.get("tags"):
-                all_tags.update(item["tags"])
+    function App() {
+      const [activeTab, setActiveTab] = useState('explore');
+      const [selectedTag, setSelectedTag] = useState('All');
+      const [search, setSearch] = useState('');
+      const [aiRecommendation, setAiRecommendation] = useState(null);
+      const [password, setPassword] = useState('');
+      const [isUnlocked, setIsUnlocked] = useState(false);
 
-        selected_tag = st.selectbox("選擇分類置物櫃：", ["全部餐廳"] + sorted(list(all_tags)))
+      const filtered = RESTAURANTS.filter(r => {
+        const matchesTag = selectedTag === 'All' || r.tags.includes(selectedTag);
+        const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || r.category.toLowerCase().includes(search.toLowerCase());
+        return matchesTag && matchesSearch;
+      });
 
-        if selected_tag != "全部餐廳":
-            filtered_data = [r for r in data if r.get("tags") and selected_tag in r["tags"]]
-        else:
-            filtered_data = data
+      const handleAiRecommend = () => {
+        const randomRes = RESTAURANTS[Math.floor(Math.random() * RESTAURANTS.length)];
+        setAiRecommendation(randomRes);
+      };
 
-        st.write(f"顯示共 **{len(filtered_data)}** 家餐廳：")
+      const handleUnlock = () => {
+        if (password === '8888') {
+          setIsUnlocked(true);
+        } else {
+          alert('授權密碼錯誤！請輸入 8888');
+        }
+      };
 
-        for spot in filtered_data:
-            with st.container(border=True):
-                st.subheader(spot.get("name", "未命名餐廳"))
-                col1, col2 = st.columns(2)
-                col1.write(f"💰 平均消費：${spot.get('avg_price', 'N/A')}")
-                col2.write(f"⭐ 評分：{spot.get('rating', 'N/A')}")
-                
-                if spot.get("tags"):
-                    st.caption("🏷️ " + " ".join([f"`#{t}`" for t in spot["tags"]]))
-                
-                btn_col1, btn_col2 = st.columns(2)
-                if spot.get("google_map_url"):
-                    btn_col1.link_button("📍 Google 地圖", spot["google_map_url"])
-                if spot.get("ig_url"):
-                    btn_col2.link_button("📸 Instagram", spot["ig_url"])
+      return (
+        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          
+          <div style={{ textAlign: 'center', padding: '15px 0', borderBottom: '1px solid #1e293b' }}>
+            <span style={{ background: 'linear-gradient(45deg, #f59e0b, #ec4899)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>
+              MIDNIGHT GOURMET
+            </span>
+            <h1 style={{ fontSize: '24px', margin: '10px 0 4px', color: '#fff' }}>Z-Gen 奢華美食地圖 🍷</h1>
+            <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>探索 Z 世代最具質感的品味餐廳與獨家獎勵</p>
+          </div>
 
-    # --- 頁籤 2：AI 今日風格氛圍 ---
-    with tab2:
-        st.subheader("🤖 AI 今日靈感推薦")
-        st.write("不確定今天想吃什麼？讓 AI 根據今日氛圍幫你挑選！")
-        
-        mood = st.radio(
-            "你今天的精神狀態/氛圍是？",
-            ["✨ 想要精緻高質感", "🔥 爽快解壓/重口味", "☕ 浪漫約會/放鬆氛圍", "🎲 隨便 AI 幫我選"]
-        )
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', margin: '16px 0' }}>
+            {[
+              { id: 'explore', label: '🎴 分類探索' },
+              { id: 'ai', label: '✨ AI 今日靈感' },
+              { id: 'rewards', label: '🏆 競賽與獎金' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: activeTab === tab.id ? '#f59e0b' : '#1e293b',
+                  color: activeTab === tab.id ? '#0f172a' : '#94a3b8',
+                  fontWeight: 'bold',
+                  fontSize: '13px'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-        if st.button("🔮 生成今日風格推薦", type="primary"):
-            recommendation = None
-            
-            if mood == "✨ 想要精緻高質感":
-                candidates = [r for r in data if r.get("avg_price", 0) and r.get("avg_price", 0) >= 1500]
-            elif mood == "🔥 爽快解壓/重口味":
-                candidates = [r for r in data if any(t in ["麻辣燙", "湖南湘菜", "川菜", "精釀啤酒"] for t in r.get("tags", []))]
-            elif mood == "☕ 浪漫約會/放鬆氛圍":
-                candidates = [r for r in data if any(t in ["約會首選", "陽明山夜景", "頂級私廚", "飯店餐廳"] for t in r.get("tags", []))]
-            else:
-                candidates = data
+          {activeTab === 'explore' && (
+            <div>
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px' }}>
+                {allTags.map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => setSelectedTag(tag)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      border: '1px solid #334155',
+                      backgroundColor: selectedTag === tag ? '#3b82f6' : '#0f172a',
+                      color: '#fff',
+                      fontSize: '12px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
 
-            if not candidates:
-                candidates = data
+              <input
+                type="text"
+                placeholder="🔍 搜尋餐廳名稱或類別..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: '1px solid #334155',
+                  backgroundColor: '#1e293b',
+                  color: '#fff',
+                  marginBottom: '16px',
+                  fontSize: '14px'
+                }}
+              />
 
-            recommendation = random.choice(candidates)
+              <div>
+                {filtered.map(r => (
+                  <div key={r.id} className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h3 style={{ margin: '0 0 6px', color: '#fff', fontSize: '18px' }}>
+                          {r.image} {r.name}
+                        </h3>
+                        <p style={{ margin: '0 0 8px', color: '#94a3b8', fontSize: '13px' }}>
+                          {r.category} • 均消 ${r.price} • ★ {r.rating}
+                        </p>
+                      </div>
+                      <span style={{ backgroundColor: '#0f172a', border: '1px solid #f59e0b', color: '#fbbf24', padding: '4px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }}>
+                        👑 連續 {r.streak} 週熱榜
+                      </span>
+                    </div>
 
-            st.balloons()
-            st.success("🎉 AI 推薦你今天去這裡：")
-            
-            with st.container(border=True):
-                st.title(f"👉 {recommendation.get('name')}")
-                st.write(f"💰 預估消費：${recommendation.get('avg_price')} | ⭐ 評分：{recommendation.get('rating')}")
-                if recommendation.get("tags"):
-                    st.write("🏷️ " + " ".join([f"`#{t}`" for t in recommendation["tags"]]))
-                
-                btn1, btn2 = st.columns(2)
-                if recommendation.get("google_map_url"):
-                    btn1.link_button("📍 前往 Google 地圖", recommendation["google_map_url"])
-                if recommendation.get("ig_url"):
-                    btn2.link_button("📸 查看 Instagram", recommendation["ig_url"])
+                    <div style={{ margin: '8px 0' }}>
+                      {r.tags.map(t => (
+                        <span key={t} className="badge" style={{ backgroundColor: '#0f172a', color: '#38bdf8' }}>
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
 
-    # --- 頁籤 3：競賽與獎金制度 ---
-    with tab3:
-        # 1. 公開區塊：店家皇冠連勝機制
-        st.subheader("👑 合作店家皇冠連勝與累積獎勵機制")
-        st.caption("店家獲得 👑 皇冠標章（上榜 Top 3）可選擇每月單次領取，或持續累積連勝解鎖更高加碼與終極福利！")
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                      <a href={r.mapUrl} target="_blank" style={{ flex: 1, textAlign: 'center', color: '#f59e0b', textDecoration: 'none', fontSize: '12px', padding: '8px', border: '1px solid #f59e0b', borderRadius: '8px', fontWeight: 'bold' }}>
+                        📍 Google 地圖
+                      </a>
+                      <a href={r.igUrl} target="_blank" style={{ flex: 1, textAlign: 'center', color: '#ec4899', textDecoration: 'none', fontSize: '12px', padding: '8px', border: '1px solid #ec4899', borderRadius: '8px', fontWeight: 'bold' }}>
+                        📸 IG 熱門打卡
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-        streak_col1, streak_col2, streak_col3 = st.columns(3)
+          {activeTab === 'ai' && (
+            <div style={{ backgroundColor: '#1e293b', padding: '24px', borderRadius: '16px', textAlign: 'center', border: '1px solid #334155' }}>
+              <h2 style={{ color: '#fff', marginTop: 0, fontSize: '20px' }}>✨ 選擇困難症解星人</h2>
+              <p style={{ color: '#94a3b8', fontSize: '13px', lineHeight: '1.5' }}>點擊下方按鈕，讓 AI 為你智慧推薦今晚最具質感的美食據點！</p>
+              <button
+                onClick={handleAiRecommend}
+                style={{ width: '100%', padding: '14px', backgroundColor: '#ec4899', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 'bold', fontSize: '15px', marginTop: '10px' }}
+              >
+                🎲 幫我選餐廳
+              </button>
 
-        with streak_col1:
-            st.caption("連勝 2 個月")
-            st.metric(label="獲得 👑 皇冠標章", value="+2% 額外獎金")
+              {aiRecommendation && (
+                <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid #ec4899', textAlign: 'left' }}>
+                  <span style={{ color: '#ec4899', fontSize: '12px', fontWeight: 'bold' }}>AI 為你挑選了：</span>
+                  <h3 style={{ color: '#fff', margin: '6px 0' }}>{aiRecommendation.image} {aiRecommendation.name}</h3>
+                  <p style={{ color: '#cbd5e1', fontSize: '13px', margin: 0 }}>類別：{aiRecommendation.category}｜均消：${aiRecommendation.price}</p>
+                </div>
+              )}
+            </div>
+          )}
 
-        with streak_col2:
-            st.caption("連勝 6 個月")
-            st.metric(label="獲得 👑👑👑 三皇冠", value="+6% 額外獎金")
+          {activeTab === 'rewards' && (
+            <div style={{ backgroundColor: '#1e293b', borderRadius: '16px', padding: '20px', border: '1px solid #334155' }}>
+              <h3 style={{ color: '#fff', fontSize: '16px', marginTop: 0 }}>🔒 內部同仁開發獎金專區</h3>
+              
+              {!isUnlocked ? (
+                <div>
+                  <p style={{ color: '#94a3b8', fontSize: '13px' }}>請輸入授權密碼以解鎖內部開發獎金與抽成明細：</p>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                    <input
+                      type="password"
+                      placeholder="請輸入密碼 (預設: 8888)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#fff', fontSize: '14px' }}
+                    />
+                    <button 
+                      onClick={handleUnlock} 
+                      style={{ padding: '10px 20px', backgroundColor: '#f59e0b', border: 'none', borderRadius: '8px', color: '#0f172a', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      解鎖
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: '10px', backgroundColor: '#0f172a', padding: '16px', borderRadius: '12px', border: '1px solid #10b981' }}>
+                  <p style={{ color: '#10b981', fontWeight: 'bold', margin: '0 0 10px', fontSize: '14px' }}>🔓 驗證成功！專案開發獎金獎勵方案：</p>
+                  <ul style={{ color: '#cbd5e1', fontSize: '13px', paddingLeft: '20px', margin: 0, lineHeight: '2' }}>
+                    <li>基礎商家上架獎金：<strong style={{ color: '#fbbf24' }}>$200 / 店</strong></li>
+                    <li>連爆熱榜（Streak ≥ 10）：<strong style={{ color: '#fbbf24' }}>額外 +$500 / 店</strong></li>
+                    <li>月度開發冠軍大獎：<strong style={{ color: '#fbbf24' }}>$3,000 NTD</strong></li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
-        with streak_col3:
-            st.caption("滿 1 年 (12 個月)")
-            st.metric(label="👑 殿堂級店家專屬", value="+12% 額外獎金", delta="加贈 12 個月免費刊登")
+        </div>
+      );
+    }
 
-        st.markdown("---")
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
+"""
 
-        # 2. 公開區塊：評選與參賽規範
-        st.info("""
-📌 **活動參與與評選規範：**
-1. **參賽資格門檻**：限當月來客數達 **1,000 人次以上**（或單月營業額達 30 萬元以上）之合作店家參加。
-2. **單一獲獎限制**：當月每家店家**限獲頒一個獎項**（若於多個榜單同時上榜，將優先保留名次較高之獎項，其餘順位由後續店家順延）。
-3. **同分比序機制**：若店家綜合評分相同，將以**加入簽約會員之時間先後順序**優先決定排名順位。
-""")
-
-        st.markdown("---")
-
-        # 3. 隱藏區塊：員工內部開發獎金（需密碼）
-        st.subheader("🔒 內部同仁開發獎金專區")
-        staff_pwd = st.text_input("請輸入員工授權密碼以查看開發獎金細節：", type="password")
-
-        # 預設密碼設定為：8888 (可自行更改)
-        if staff_pwd == "8888":
-            st.success("🔓 驗證成功！已解鎖內部同仁獎金制度：")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("基礎推薦獎金", "$200 / 店", "成功建立資料並核准")
-            col2.metric("高人氣店家加碼", "$500 / 店", "獲得 50+ 次收藏/點擊")
-            col3.metric("月度開發王獎金", "$3,000", "當月新增最多有效店家")
-
-            st.write("**📋 獎金發放與審核規則：**")
-            st.markdown("""
-            * **完整欄位要求**：新增店家必須包含 `店家名稱`、`平均消費`、`Google 地圖連結` 及至少 `2 個標籤`。
-            * **品質與核實**：由管理團隊審核資料真實性，通過後於次月薪資統一發放。
-            * **重複店家判定**：若重複推薦，獎金歸屬於首位提交完整資料之同仁。
-            """)
-        elif staff_pwd != "":
-            st.error("❌ 密碼錯誤，請重新輸入！")
-
-except Exception as e:
-    st.error(f"連線失敗：{e}")
+components.html(html_code, height=850, scrolling=True)
